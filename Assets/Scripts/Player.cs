@@ -7,6 +7,10 @@ public class Player : NetworkBehaviour
 
     [SerializeField] float speed = 5f;
     [SerializeField] GameObject ballPrefab;
+    [SerializeField] GameObject floatingIcon; // Reference to the icon above the player's head
+    [Networked] public bool controlsSwapped { get; private set; } // Tracks whether the player controls are swapped
+    [Networked] private TickTimer SwapTimer { get; set; } // Tracks shield duration
+
 
     private Camera firstPersonCamera;
 
@@ -23,6 +27,12 @@ public class Player : NetworkBehaviour
             if (firstPersonCameraComponent && firstPersonCameraComponent.isActiveAndEnabled)
                 firstPersonCameraComponent.SetTarget(this.transform);
         }
+
+        // Ensure the floating icon is initially hidden
+        if (floatingIcon != null)
+        {
+            floatingIcon.SetActive(false);
+        }
     }
 
     private Vector3 moveDirection;
@@ -34,7 +44,12 @@ public class Player : NetworkBehaviour
             if (inputData.moveActionValue.magnitude > 0)
             {
                 inputData.moveActionValue.Normalize(); // Ensure that the vector magnitude is 1
-                moveDirection = new Vector3(inputData.moveActionValue.x, 0, inputData.moveActionValue.y);
+
+                // Swap controls if the effect is active
+                var moveX = controlsSwapped ? -inputData.moveActionValue.x : inputData.moveActionValue.x;
+                var moveY = controlsSwapped ? -inputData.moveActionValue.y : inputData.moveActionValue.y;
+
+                moveDirection = new Vector3(moveX, 0, moveY);
                 Vector3 DeltaX = speed * moveDirection * Runner.DeltaTime;
                 _cc.Move(DeltaX);
             }
@@ -56,6 +71,11 @@ public class Player : NetworkBehaviour
         {
             DeactivateShield();
         }
+        // Check if the swap timer has expired
+        if (controlsSwapped && SwapTimer.Expired(Runner))
+        {
+            UnswapControls();
+        }
     }
 
     public void ActivateShield(float duration)
@@ -73,6 +93,35 @@ public class Player : NetworkBehaviour
         IsShielded = false;
         // Shield object will automatically despawn after its duration
     }
+    public void SwapControls(float duration)
+    {
+        if (controlsSwapped) return;
+
+        controlsSwapped = true;
+        SwapTimer = TickTimer.CreateFromSeconds(Runner, duration);
+
+        // Trigger a network event to show the icon
+        RPC_ShowFloatingIcon(true);
+    }
+    private void UnswapControls()
+    {
+        controlsSwapped = false;
+
+        // Trigger a network event to hide the icon
+        RPC_ShowFloatingIcon(false);
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_ShowFloatingIcon(bool isVisible)
+    {
+        // Update the floating icon visibility on all clients
+        if (floatingIcon != null)
+        {
+            floatingIcon.SetActive(isVisible);
+        }
+    }
+
+    
 
     private void OnCollisionEnter(Collision collision)
     {
@@ -80,6 +129,12 @@ public class Player : NetworkBehaviour
         {
             // Absorb the ball hit
             Debug.Log("Shield absorbed the ball!");
+        }
+
+        if(controlsSwapped && collision.gameObject.CompareTag("Ball"))
+        {
+            // Swap the controls
+            Debug.Log("Controls swapped!");
         }
     }
 }

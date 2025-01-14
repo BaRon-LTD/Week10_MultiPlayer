@@ -3,7 +3,7 @@ using Fusion;
 
 public class Shield : NetworkBehaviour
 {
-    public float shieldDuration = 3.0f; // Duration of the shield effect
+    [SerializeField] public float shieldDuration = 3.0f; // Duration of the shield effect
 
     private void OnTriggerEnter(Collider other)
     {
