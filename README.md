@@ -1,5 +1,8 @@
 <div dir='rtl' lang='he'>
 
+itch.io : 
+https://barmud.itch.io/week10
+
 # Multiplayer games using Photon Fusion 2
 
 The code is adapted from two tutorials:
